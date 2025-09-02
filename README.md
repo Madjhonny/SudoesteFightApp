@@ -51,9 +51,9 @@ PostgreSQL
 Siga os passos abaixo para configurar e executar o ambiente de desenvolvimento na sua máquina.
 
 Pré-requisitos
-Node.js e npm: Baixe aqui
+Node.js e npm
 
-Git: Baixe aqui
+Git
 
 PostgreSQL: Um servidor PostgreSQL instalado e rodando. Baixe aqui
 
