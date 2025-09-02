@@ -1,0 +1,17 @@
+# Dependencies
+/node_modules
+
+# Production
+/build
+
+# Temporary files
+.DS_Store
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Uploaded files (fotos dos usuários)
+/uploads
+
+# Environment variables - Se você usar um arquivo .env para senhas
+.env
