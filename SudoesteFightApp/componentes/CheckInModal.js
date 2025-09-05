@@ -9,11 +9,16 @@ export default function CheckInModal({
   checkedInAlunos,
   loading,
   userHasCheckedIn,
+  isClassFinished, // <--  propriedade para saber se a aula já passou
   onCheckIn,
   onCancelCheckIn
 }) {
-  // Se não houver uma aula selecionada, não renderiza nada
-  if (!aula) return null;
+  if (!aula) {
+    return null;
+  }
+
+  // Lógica para determinar se o botão de cancelar deve estar ativo
+  const canCancel = userHasCheckedIn && !isClassFinished;
 
   return (
     <Modal
@@ -30,22 +35,33 @@ export default function CheckInModal({
           <Text style={styles.listHeader}>Check-ins Confirmados ({checkedInAlunos.length})</Text>
           
           {loading ? (
-            <ActivityIndicator color="#FFD700" style={{ marginVertical: 20 }} />
+            <ActivityIndicator size="small" color="#FFD700" style={{ marginVertical: 20 }} />
           ) : (
             <FlatList
-              style={styles.list}
               data={checkedInAlunos}
               keyExtractor={(item) => item.id.toString()}
-              renderItem={({ item }) => <Text style={styles.alunoNome}>- {item.nome}</Text>}
-              ListEmptyComponent={<Text style={styles.emptyListText}>Ninguém fez check-in ainda.</Text>}
+              renderItem={({ item }) => <Text style={styles.alunoItem}>- {item.nome}</Text>}
+              ListEmptyComponent={<Text style={styles.alunoItem}>Ninguém fez check-in ainda.</Text>}
+              style={styles.alunoList}
             />
           )}
 
+          {/* Botão principal com a nova lógica */}
           <TouchableOpacity
-            style={[styles.button, userHasCheckedIn ? styles.buttonCancel : styles.buttonCheckIn]}
-            onPress={userHasCheckedIn ? onCancelCheckIn : onCheckIn}
+            style={[
+              styles.button,
+              userHasCheckedIn
+                ? (isClassFinished ? styles.buttonConfirmed : styles.buttonCancel)
+                : styles.buttonCheckIn
+            ]}
+            onPress={userHasCheckedIn ? (canCancel ? onCancelCheckIn : null) : onCheckIn}
+            disabled={userHasCheckedIn && isClassFinished} // Desabilita o botão se o check-in estiver feito e a aula já passou
           >
-            <Text style={styles.textStyle}>{userHasCheckedIn ? 'Cancelar Check-in' : 'Fazer Check-in'}</Text>
+            <Text style={styles.textStyle}>
+              {userHasCheckedIn
+                ? (isClassFinished ? 'Check-in Realizado' : 'Cancelar Check-in')
+                : 'Fazer Check-in'}
+            </Text>
           </TouchableOpacity>
 
           <TouchableOpacity
@@ -68,24 +84,25 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(0, 0, 0, 0.8)',
   },
   modalView: {
-    margin: 20,
+    width: '90%',
     backgroundColor: '#1e1e1e',
     borderRadius: 20,
     padding: 25,
     alignItems: 'center',
-    shadowColor: '#FFD700',
-    shadowOffset: { width: 0, height: 2 },
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
     shadowOpacity: 0.25,
     shadowRadius: 4,
     elevation: 5,
-    width: '90%',
   },
   modalTitle: {
     fontSize: 22,
     fontWeight: 'bold',
     color: '#FFD700',
-    marginBottom: 5,
-    textAlign: 'center',
+    marginBottom: 8,
   },
   modalSubtitle: {
     fontSize: 16,
@@ -99,40 +116,41 @@ const styles = StyleSheet.create({
     alignSelf: 'flex-start',
     marginBottom: 10,
   },
-  list: {
+  alunoList: {
     width: '100%',
     maxHeight: 150,
     marginBottom: 20,
   },
-  alunoNome: {
-    color: '#ddd',
+  alunoItem: {
     fontSize: 16,
+    color: '#ddd',
     paddingVertical: 4,
-  },
-  emptyListText: {
-    color: '#888',
-    fontStyle: 'italic',
-    textAlign: 'center',
   },
   button: {
     borderRadius: 10,
     padding: 12,
     elevation: 2,
     width: '100%',
-    marginBottom: 10,
+    marginTop: 10,
   },
   buttonCheckIn: {
-    backgroundColor: '#FFD700',
+    backgroundColor: '#4CAF50', // Verde para fazer check-in
   },
   buttonCancel: {
     backgroundColor: '#c1121f', // Vermelho para cancelar
   },
+  buttonConfirmed: {
+    backgroundColor: '#2a9d8f', // Um verde diferente para "realizado"
+    opacity: 0.7,
+  },
   buttonClose: {
-    backgroundColor: '#444',
+    backgroundColor: '#6c757d',
   },
   textStyle: {
     color: 'white',
     fontWeight: 'bold',
     textAlign: 'center',
+    fontSize: 16,
   },
 });
+
