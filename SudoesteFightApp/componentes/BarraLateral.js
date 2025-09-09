@@ -1,4 +1,3 @@
-// componentes/BarraLateral.js
 import React from 'react';
 import { View, Text, Image, TouchableOpacity, StyleSheet, SafeAreaView, Alert } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
@@ -6,36 +5,26 @@ import { useAuth } from '../context/AuthContext';
 import * as ImagePicker from 'expo-image-picker';
 import axios from 'axios';
 
-// IMPORTANTE: Garanta que este IP é o mesmo que você está usando nas outras telas
-const API_URL = "http://192.168.100.5:3000"; 
+const API_URL = "http://192.168.100.7:3000";
 
 export default function BarraLateral() {
   const navigation = useNavigation();
-  // Pegamos a função 'login' também, para atualizar o usuário após o upload
-  const { user, logout, login } = useAuth(); 
+  const { user, logout, login } = useAuth();
 
   const pickImage = async () => {
-    // 1. Pede permissão para acessar a galeria de mídia
     const permissionResult = await ImagePicker.requestMediaLibraryPermissionsAsync();
-
     if (permissionResult.granted === false) {
       Alert.alert("Permissão necessária", "Você precisa permitir o acesso à galeria para trocar a foto.");
       return;
     }
-
-    // 2. Abre a galeria para o usuário escolher a imagem
     const pickerResult = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ImagePicker.MediaTypeOptions.Images,
       allowsEditing: true,
-      aspect: [1, 1], // Força um corte quadrado
-      quality: 0.5, // Comprime a imagem para um upload mais rápido
+      aspect: [1, 1],
+      quality: 0.5,
     });
+    if (pickerResult.canceled === true) return;
 
-    if (pickerResult.canceled === true) {
-      return; // Usuário cancelou a seleção
-    }
-
-    // 3. Prepara a imagem para o envio (upload)
     const imageUri = pickerResult.assets[0].uri;
     const formData = new FormData();
     const filename = imageUri.split('/').pop();
@@ -44,17 +33,11 @@ export default function BarraLateral() {
 
     formData.append('foto', { uri: imageUri, name: filename, type });
 
-    // 4. Envia a imagem para o backend
     try {
       const response = await axios.post(`${API_URL}/api/alunos/${user.matricula}/foto`, formData, {
-        headers: {
-          'Content-Type': 'multipart/form-data',
-        },
+        headers: { 'Content-Type': 'multipart/form-data' },
       });
-      
-      // 5. Atualiza o usuário no Contexto com os novos dados vindos do backend
-      login(response.data); 
-      
+      login(response.data);
       Alert.alert("Sucesso", "Foto de perfil atualizada!");
     } catch (error) {
       console.error("Erro no upload da imagem:", error);
@@ -67,23 +50,26 @@ export default function BarraLateral() {
     navigation.navigate('Login');
   };
 
-  if (!user) {
-    return null;
-  }
+  if (!user) return null;
 
   return (
     <SafeAreaView style={styles.container}>
       <View>
         <TouchableOpacity onPress={pickImage}>
-          <Image 
-            // Usa a foto_url do usuário; se não houver, usa a imagem padrão
-            source={{ uri: user.foto_url || "https://i.pravatar.cc/150" }} 
-            style={styles.foto} 
+          <Image
+            source={{ uri: user.foto_url || "https://i.pravatar.cc/150" }}
+            style={styles.foto}
           />
         </TouchableOpacity>
         <Text style={styles.nome}>{user.nome}</Text>
         <Text style={styles.modalidade}>{user.modalidade}</Text>
       </View>
+
+      {user.role === 'professor' && (
+        <TouchableOpacity style={styles.menuItem} onPress={() => navigation.navigate('PainelProfessor')}>
+          <Text style={styles.menuItemText}>Painel do Professor</Text>
+        </TouchableOpacity>
+      )}
 
       <TouchableOpacity style={styles.botaoSair} onPress={handleLogout}>
         <Text style={styles.textoBotaoSair}>Sair</Text>
@@ -131,5 +117,17 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     textAlign: 'center',
     fontSize: 16,
+  },
+  menuItem: {
+    backgroundColor: '#1e1e1e',
+    paddingVertical: 15,
+    borderRadius: 10,
+    marginBottom: 20,
+  },
+  menuItemText: {
+    color: '#FFD700',
+    fontSize: 18,
+    textAlign: 'center',
+    fontWeight: '600',
   },
 });

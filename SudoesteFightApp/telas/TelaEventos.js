@@ -4,7 +4,7 @@ import axios from 'axios';
 import { useFocusEffect } from '@react-navigation/native'; // Hook para detetar quando o ecrã está focado
 import { useNotification } from '../context/NotificationContext'; // Hook do nosso contexto de notificação
 
-const API_URL = "http://192.168.100.5:3000"; // Confirme se o IP está correto
+const API_URL = "http://192.168.100.7:3000"; // Confirme se o IP está correto
 
 const AvisoItem = ({ item }) => (
   <View style={styles.avisoContainer}>

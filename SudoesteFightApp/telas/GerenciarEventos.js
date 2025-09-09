@@ -1,63 +1,95 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { View, Text, StyleSheet, FlatList, ActivityIndicator, TouchableOpacity, Modal, TextInput, SafeAreaView, Alert } from 'react-native';
+import { View, Text, StyleSheet, FlatList, ActivityIndicator, TouchableOpacity, Modal, TextInput, SafeAreaView, Alert, Image, ScrollView } from 'react-native';
 import axios from 'axios';
 import { useAuth } from '../context/AuthContext';
+import * as ImagePicker from 'expo-image-picker';
 
-const API_URL = "http://192.168.100.5:3000"; // Confirme se o IP está correto
+const API_URL = "http://192.168.100.7:3000"; // Confirme se o seu IP está correto
 
 // --- Componente para o Modal de Adicionar/Editar ---
 const AvisoModal = ({ visible, onClose, onSave, avisoInicial }) => {
     const [titulo, setTitulo] = useState('');
     const [mensagem, setMensagem] = useState('');
+    const [media, setMedia] = useState(null); // Para guardar a mídia selecionada (URI local)
 
     useEffect(() => {
-        // Preenche o formulário se estiver a editar um aviso existente
         if (avisoInicial) {
             setTitulo(avisoInicial.titulo || '');
             setMensagem(avisoInicial.mensagem || '');
-        } else { // Limpa o formulário se estiver a criar um novo
+            setMedia(avisoInicial.media_url ? { uri: avisoInicial.media_url } : null);
+        } else {
             setTitulo('');
             setMensagem('');
+            setMedia(null);
         }
     }, [avisoInicial]);
+
+    const handleSelectMedia = async () => {
+        const permissionResult = await ImagePicker.requestMediaLibraryPermissionsAsync();
+        if (!permissionResult.granted) {
+            Alert.alert("Permissão necessária", "É preciso permitir o acesso à galeria.");
+            return;
+        }
+
+        const pickerResult = await ImagePicker.launchImageLibraryAsync({
+            mediaTypes: ImagePicker.MediaTypeOptions.All, // Permite imagens e vídeos
+            allowsEditing: true,
+            quality: 0.7,
+        });
+
+        if (pickerResult.canceled) {
+            return;
+        }
+        setMedia(pickerResult.assets[0]);
+    };
 
     const handleSave = () => {
         if (!titulo.trim() || !mensagem.trim()) {
             Alert.alert("Campos obrigatórios", "Por favor, preencha o título e a mensagem.");
             return;
         }
-        onSave({ ...avisoInicial, titulo, mensagem });
+        onSave({ ...avisoInicial, titulo, mensagem, media });
     };
 
     return (
         <Modal visible={visible} animationType="slide" transparent={true} onRequestClose={onClose}>
             <SafeAreaView style={styles.modalContainer}>
-                <View style={styles.modalContent}>
-                    <Text style={styles.modalTitle}>{avisoInicial ? 'Editar Aviso' : 'Novo Aviso'}</Text>
-                    <TextInput
-                        style={styles.input}
-                        placeholder="Título do Aviso"
-                        placeholderTextColor="#888"
-                        value={titulo}
-                        onChangeText={setTitulo}
-                    />
-                    <TextInput
-                        style={[styles.input, styles.textArea]}
-                        placeholder="Mensagem"
-                        placeholderTextColor="#888"
-                        value={mensagem}
-                        onChangeText={setMensagem}
-                        multiline
-                    />
-                    <View style={styles.modalButtonRow}>
-                        <TouchableOpacity style={[styles.button, styles.buttonSave]} onPress={handleSave}>
-                            <Text style={styles.buttonText}>Salvar</Text>
+                <ScrollView contentContainerStyle={{ flexGrow: 1, justifyContent: 'center', alignItems: 'center' }}>
+                    <View style={styles.modalContent}>
+                        <Text style={styles.modalTitle}>{avisoInicial ? 'Editar Aviso' : 'Novo Aviso'}</Text>
+                        <TextInput
+                            style={styles.input}
+                            placeholder="Título do Aviso"
+                            placeholderTextColor="#888"
+                            value={titulo}
+                            onChangeText={setTitulo}
+                        />
+                        <TextInput
+                            style={[styles.input, styles.textArea]}
+                            placeholder="Mensagem"
+                            placeholderTextColor="#888"
+                            value={mensagem}
+                            onChangeText={setMensagem}
+                            multiline
+                        />
+
+                        {/* Preview da Mídia */}
+                        {media && <Image source={{ uri: media.uri }} style={styles.mediaPreview} />}
+
+                        <TouchableOpacity style={styles.mediaButton} onPress={handleSelectMedia}>
+                            <Text style={styles.mediaButtonText}>{media ? 'Trocar Mídia' : 'Anexar Mídia'}</Text>
                         </TouchableOpacity>
-                        <TouchableOpacity style={[styles.button, styles.buttonClose]} onPress={onClose}>
-                            <Text style={styles.buttonText}>Cancelar</Text>
-                        </TouchableOpacity>
+
+                        <View style={styles.modalButtonRow}>
+                            <TouchableOpacity style={[styles.button, styles.buttonSave]} onPress={handleSave}>
+                                <Text style={styles.buttonText}>Salvar</Text>
+                            </TouchableOpacity>
+                            <TouchableOpacity style={[styles.button, styles.buttonClose]} onPress={onClose}>
+                                <Text style={styles.buttonText}>Cancelar</Text>
+                            </TouchableOpacity>
+                        </View>
                     </View>
-                </View>
+                </ScrollView>
             </SafeAreaView>
         </Modal>
     );
@@ -76,7 +108,6 @@ export default function GerenciarEventos() {
             const response = await axios.get(`${API_URL}/api/avisos`);
             setAvisos(response.data);
         } catch (error) {
-            console.error("Erro ao buscar avisos:", error);
             Alert.alert("Erro", "Não foi possível carregar os avisos.");
         } finally {
             setLoading(false);
@@ -88,70 +119,60 @@ export default function GerenciarEventos() {
     }, [fetchAvisos]);
 
     const handleSaveAviso = async (aviso) => {
-        const payload = {
-            titulo: aviso.titulo,
-            mensagem: aviso.mensagem,
-            aluno_id: user.id, // Para o middleware de autorização do backend
-        };
+        const formData = new FormData();
+        formData.append('titulo', aviso.titulo);
+        formData.append('mensagem', aviso.mensagem);
+        formData.append('aluno_id', user.matricula); // Envia matrícula para backend
+
+        // Anexa a nova mídia apenas se ela foi selecionada (se tem um 'uri' local)
+        if (aviso.media && aviso.media.uri && !aviso.media.uri.startsWith('http')) {
+            const filename = aviso.media.uri.split('/').pop();
+            const match = /\.(\w+)$/.exec(filename);
+            const type = match ? `image/${match[1]}` : `media`;
+            formData.append('media', { uri: aviso.media.uri, name: filename, type });
+        }
 
         try {
-            if (aviso.id) { // Editando um aviso existente
-                await axios.put(`${API_URL}/api/avisos/${aviso.id}`, payload);
-            } else { // Criando um novo aviso
-                await axios.post(`${API_URL}/api/avisos`, payload);
+            const config = { headers: { 'Content-Type': 'multipart/form-data' } };
+            if (aviso.id) { // Editando
+                await axios.put(`${API_URL}/api/avisos/${aviso.id}`, formData, config);
+            } else { // Criando
+                await axios.post(`${API_URL}/api/avisos`, formData, config);
             }
             setModalVisible(false);
-            setAvisoSelecionado(null);
-            fetchAvisos(); // Recarrega a lista para mostrar as alterações
+            fetchAvisos();
         } catch (error) {
-            console.error("Erro ao salvar aviso:", error.response?.data || error.message);
+            console.error("Erro ao salvar aviso:", error.response?.data || error);
             Alert.alert("Erro", "Não foi possível salvar o aviso.");
         }
     };
 
     const handleDeleteAviso = (id) => {
-        Alert.alert(
-            "Confirmar Exclusão",
-            "Tem a certeza que deseja apagar este aviso?",
-            [
-                { text: "Cancelar", style: "cancel" },
-                {
-                    text: "Apagar", style: "destructive",
-                    onPress: async () => {
-                        try {
-                            // O método delete no axios envia o corpo da requisição de forma diferente
-                            await axios.delete(`${API_URL}/api/avisos/${id}`, {
-                                data: { aluno_id: user.id } // Passa o ID no corpo para o middleware
-                            });
-                            fetchAvisos();
-                        } catch (error) {
-                            console.error("Erro ao apagar aviso:", error.response?.data || error.message);
-                            Alert.alert("Erro", "Não foi possível apagar o aviso.");
-                        }
+        Alert.alert("Confirmar Exclusão", "Tem a certeza que deseja apagar este aviso?", [
+            { text: "Cancelar" },
+            {
+                text: "Apagar", style: "destructive",
+                onPress: async () => {
+                    try {
+                        await axios.delete(`${API_URL}/api/avisos/${id}?aluno_id=${user.matricula}`);
+                        fetchAvisos();
+                    } catch (error) {
+                        Alert.alert("Erro", "Não foi possível apagar o aviso.");
                     }
                 }
-            ]
-        );
-    };
-
-    const openModalParaEditar = (aviso) => {
-        setAvisoSelecionado(aviso);
-        setModalVisible(true);
-    };
-
-    const openModalParaCriar = () => {
-        setAvisoSelecionado(null);
-        setModalVisible(true);
+            }
+        ]);
     };
 
     const renderItem = ({ item }) => (
         <View style={styles.avisoContainer}>
-            <View>
+            {item.media_url && <Image source={{ uri: item.media_url }} style={styles.avisoImage} />}
+            <View style={styles.avisoContent}>
                 <Text style={styles.avisoTitulo}>{item.titulo}</Text>
                 <Text style={styles.avisoMensagem}>{item.mensagem}</Text>
             </View>
             <View style={styles.actionsContainer}>
-                <TouchableOpacity style={styles.actionButton} onPress={() => openModalParaEditar(item)}>
+                <TouchableOpacity style={styles.actionButton} onPress={() => { setAvisoSelecionado(item); setModalVisible(true); }}>
                     <Text style={styles.actionText}>Editar</Text>
                 </TouchableOpacity>
                 <TouchableOpacity style={styles.actionButton} onPress={() => handleDeleteAviso(item.id)}>
@@ -174,8 +195,7 @@ export default function GerenciarEventos() {
                 ListEmptyComponent={<Text style={styles.emptyText}>Nenhum aviso publicado.</Text>}
                 style={styles.list}
             />
-            {/* Botão flutuante para adicionar novo aviso */}
-            <TouchableOpacity style={styles.fab} onPress={openModalParaCriar}>
+            <TouchableOpacity style={styles.fab} onPress={() => { setAvisoSelecionado(null); setModalVisible(true); }}>
                 <Text style={styles.fabText}>+</Text>
             </TouchableOpacity>
             <AvisoModal
@@ -196,67 +216,70 @@ const styles = StyleSheet.create({
     avisoContainer: {
         backgroundColor: '#1e1e1e',
         borderRadius: 8,
-        padding: 15,
         marginHorizontal: 15,
-        marginVertical: 8,
+        marginVertical: 10,
+        overflow: 'hidden',
+    },
+    avisoImage: {
+        width: '100%',
+        height: 200,
+        backgroundColor: '#333',
+    },
+    avisoContent: {
+        padding: 15,
     },
     avisoTitulo: { color: '#FFD700', fontSize: 18, fontWeight: 'bold' },
     avisoMensagem: { color: '#fff', fontSize: 16, marginTop: 5 },
     actionsContainer: {
         flexDirection: 'row',
         justifyContent: 'flex-end',
-        marginTop: 15,
         borderTopWidth: 1,
         borderTopColor: '#333',
-        paddingTop: 10,
+        padding: 10,
     },
-    actionButton: { marginLeft: 15 },
+    actionButton: { marginLeft: 20, padding: 5 },
     actionText: { color: '#FFD700', fontSize: 16 },
     deleteText: { color: '#c1121f' },
     fab: {
-        position: 'absolute',
-        bottom: 30,
-        right: 30,
-        width: 60,
-        height: 60,
-        borderRadius: 30,
-        backgroundColor: '#FFD700',
-        justifyContent: 'center',
-        alignItems: 'center',
-        elevation: 8,
+        position: 'absolute', bottom: 30, right: 30, width: 60, height: 60, borderRadius: 30,
+        backgroundColor: '#FFD700', justifyContent: 'center', alignItems: 'center', elevation: 8,
     },
     fabText: { fontSize: 30, color: '#000' },
-    // Estilos do Modal
-    modalContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: 'rgba(0,0,0,0.7)' },
+    modalContainer: { flex: 1, justifyContent: 'center', backgroundColor: 'rgba(0,0,0,0.8)' },
     modalContent: {
-        backgroundColor: '#1e1e1e',
-        borderRadius: 20,
-        padding: 20,
-        width: '90%',
-        alignItems: 'center',
+        backgroundColor: '#1e1e1e', borderRadius: 20, padding: 20, width: '90%',
     },
-    modalTitle: { fontSize: 22, fontWeight: 'bold', color: '#FFD700', marginBottom: 20 },
+    modalTitle: { fontSize: 22, fontWeight: 'bold', color: '#FFD700', marginBottom: 20, textAlign: 'center' },
     input: {
+        backgroundColor: '#333', color: '#fff', borderRadius: 10, padding: 15,
+        width: '100%', marginBottom: 15, fontSize: 16,
+    },
+    textArea: { height: 120, textAlignVertical: 'top' },
+    mediaPreview: {
+        width: '100%',
+        height: 180,
+        borderRadius: 10,
+        marginBottom: 15,
         backgroundColor: '#333',
-        color: '#fff',
+    },
+    mediaButton: {
+        backgroundColor: '#555',
         borderRadius: 10,
         padding: 15,
         width: '100%',
-        marginBottom: 15,
+        alignItems: 'center',
+        marginBottom: 20,
+    },
+    mediaButtonText: {
+        color: '#FFD700',
+        fontWeight: 'bold',
         fontSize: 16,
     },
-    textArea: { height: 100, textAlignVertical: 'top' },
     modalButtonRow: { flexDirection: 'row', justifyContent: 'space-between', width: '100%' },
     button: {
-        borderRadius: 10,
-        padding: 15,
-        elevation: 2,
-        flex: 1,
-        marginHorizontal: 5,
-        alignItems: 'center',
+        borderRadius: 10, padding: 15, elevation: 2, flex: 1, marginHorizontal: 5, alignItems: 'center',
     },
     buttonSave: { backgroundColor: '#FFD700' },
     buttonClose: { backgroundColor: '#555' },
     buttonText: { color: '#000', fontWeight: 'bold', textAlign: 'center' },
 });
-

@@ -7,9 +7,10 @@ export default function PainelProfessor({ navigation }) {
       <View style={styles.container}>
         <Text style={styles.title}>Área do Professor</Text>
         
+        {/* Este botão agora está funcional e navega para a nova tela */}
         <TouchableOpacity 
           style={styles.button}
-          onPress={() => alert('Gestão da Agenda em breve!')}
+          onPress={() => navigation.navigate('GerenciarAgenda')}
         >
           <Text style={styles.buttonText}>Gerir Grade de Horários</Text>
         </TouchableOpacity>

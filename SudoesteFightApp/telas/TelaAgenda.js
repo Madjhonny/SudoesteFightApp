@@ -3,13 +3,13 @@ import { View, Text, TouchableOpacity, StyleSheet, ScrollView, ActivityIndicator
 import axios from 'axios';
 import { useAuth } from '../context/AuthContext';
 import CheckInModal from '../componentes/CheckInModal';
+import AulaModal from '../componentes/AulaModal';
 
-// Garanta que este IP está correto para sua rede local
-const API_URL = "http://192.168.100.5:3000";
+// Garanta que este IP está correto para a sua rede local
+const API_URL = "http://192.168.100.7:3000";
 
 const dias = ["Seg", "Ter", "Qua", "Qui", "Sex", "Sab"];
 
-// Gera uma lista de horários para a grade
 const gerarHorarios = () => {
   let horarios = [];
   for (let h = 6; h <= 21; h++) {
@@ -20,7 +20,6 @@ const gerarHorarios = () => {
   return horarios;
 };
 
-// Função para obter a data de hoje no formato YYYY-MM-DD
 const getTodayDateString = () => {
   const today = new Date();
   const year = today.getFullYear();
@@ -37,60 +36,53 @@ export default function AgendaScreen() {
   const [error, setError] = useState(null);
   const horarios = gerarHorarios();
 
-  // Estados para o Modal
-  const [modalVisible, setModalVisible] = useState(false);
-  const [aulaSelecionada, setAulaSelecionada] = useState(null);
+  const [checkInModalVisible, setCheckInModalVisible] = useState(false);
+  const [aulaParaCheckIn, setAulaParaCheckIn] = useState(null);
   const [checkedInAlunos, setCheckedInAlunos] = useState([]);
-  const [loadingModal, setLoadingModal] = useState(false);
+  const [loadingCheckIn, setLoadingCheckIn] = useState(false);
 
-  // Função que verifica se a aula já passou, baseando-se no dia da semana também
+  const [aulaModalVisible, setAulaModalVisible] = useState(false);
+  const [aulaParaGerir, setAulaParaGerir] = useState(null);
+  const [horarioParaNovaAula, setHorarioParaNovaAula] = useState(null);
+
   const checkIsClassFinished = (horario) => {
     const diaAbreviado = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sab"];
     const hoje = new Date();
-    const diaDaSemanaHoje = diaAbreviado[hoje.getDay()];
-
-    // A regra só se aplica se o dia selecionado for o dia de hoje
-    if (diaSelecionado !== diaDaSemanaHoje) {
+    if (diaSelecionado !== diaAbreviado[hoje.getDay()]) {
       return false;
     }
-    
     const [hours, minutes] = horario.split(':').map(Number);
     const classTime = new Date();
     classTime.setHours(hours, minutes, 0, 0);
-
     return hoje > classTime;
   };
 
   const fetchAgenda = useCallback(async () => {
+    setLoading(true);
     try {
-      setLoading(true);
       const response = await axios.get(`${API_URL}/api/agenda`);
       setAulasDaSemana(response.data);
     } catch (err) {
-      console.error("Erro ao buscar a agenda:", err);
-      setError("Não foi possível carregar a agenda. Verifique a conexão.");
+      setError("Não foi possível carregar a agenda.");
     } finally {
       setLoading(false);
     }
   }, []);
 
-  useEffect(() => {
-    fetchAgenda();
-  }, [fetchAgenda]);
+  useEffect(() => { fetchAgenda(); }, [fetchAgenda]);
 
-  const handleAulaPress = async (aula) => {
-    setAulaSelecionada(aula);
-    setModalVisible(true);
-    setLoadingModal(true);
+  const handleOpenCheckInModal = async (aula) => {
+    setAulaParaCheckIn(aula);
+    setCheckInModalVisible(true);
+    setLoadingCheckIn(true);
     try {
       const today = getTodayDateString();
       const response = await axios.get(`${API_URL}/api/checkins/aula/${aula.id}/data/${today}`);
       setCheckedInAlunos(response.data);
     } catch (err) {
-      console.error("Erro ao buscar check-ins:", err);
-      Alert.alert("Erro", "Não foi possível carregar os check-ins desta aula.");
+      Alert.alert("Erro", "Não foi possível carregar os check-ins.");
     } finally {
-      setLoadingModal(false);
+      setLoadingCheckIn(false);
     }
   };
 
@@ -98,15 +90,11 @@ export default function AgendaScreen() {
     try {
       await axios.post(`${API_URL}/api/checkins`, {
         aluno_id: user.id,
-        aula_id: aulaSelecionada.id,
+        aula_id: aulaParaCheckIn.id,
         data_checkin: getTodayDateString(),
       });
-      // Atualiza a lista de check-ins no modal
-      handleAulaPress(aulaSelecionada);
-    } catch (err) {
-      console.error("Erro ao fazer check-in:", err);
-      Alert.alert("Erro", "Não foi possível realizar o check-in.");
-    }
+      await handleOpenCheckInModal(aulaParaCheckIn);
+    } catch (err) { Alert.alert("Erro", "Não foi possível realizar o check-in."); }
   };
 
   const handleCancelCheckIn = async () => {
@@ -114,66 +102,87 @@ export default function AgendaScreen() {
       await axios.delete(`${API_URL}/api/checkins`, {
         data: {
           aluno_id: user.id,
-          aula_id: aulaSelecionada.id,
+          aula_id: aulaParaCheckIn.id,
           data_checkin: getTodayDateString(),
         }
       });
-      // Atualiza a lista de check-ins no modal
-      handleAulaPress(aulaSelecionada);
-    } catch (err) {
-      console.error("Erro ao cancelar check-in:", err);
-      Alert.alert("Erro", "Não foi possível cancelar o check-in.");
+      await handleOpenCheckInModal(aulaParaCheckIn);
+    } catch (err) { Alert.alert("Erro", "Não foi possível cancelar o check-in."); }
+  };
+
+  const handleOpenAulaModal = (aula, horario) => {
+    setAulaParaGerir(aula);
+    setHorarioParaNovaAula(horario);
+    setAulaModalVisible(true);
+  };
+
+  const handleSaveAula = async (aula) => {
+    const payload = {
+      dia_semana: aula.dia_semana,
+      horario: aula.horario,
+      modalidade: aula.modalidade,
+      aluno_id: user.id,
+    };
+    try {
+      if (aula.id) { await axios.put(`${API_URL}/api/aulas/${aula.id}`, payload); }
+      else { await axios.post(`${API_URL}/api/aulas`, payload); }
+      setAulaModalVisible(false);
+      fetchAgenda();
+    } catch (error) { Alert.alert("Erro", "Não foi possível salvar a aula."); }
+  };
+
+  const handleDeleteAula = (aula) => {
+    Alert.alert("Apagar Aula", `Tem a certeza que deseja apagar a aula de ${aula.modalidade} às ${aula.horario}?`, [
+      { text: "Cancelar" },
+      { text: "Apagar", style: "destructive", onPress: async () => {
+          try {
+            await axios.delete(`${API_URL}/api/aulas/${aula.id}?aluno_id=${user.id}`);
+            fetchAgenda();
+          } catch (error) { Alert.alert("Erro", "Não foi possível apagar a aula."); }
+      }}
+    ]);
+  };
+
+  const handleSlotPress = (aulasDoHorario, horario) => {
+    if (user.role === 'professor') {
+      if (aulasDoHorario.length > 0) {
+        const aula = aulasDoHorario[0];
+        Alert.alert(aula.modalidade, 'Escolha uma ação:', [
+          { text: 'Ver Check-ins', onPress: () => handleOpenCheckInModal(aula) },
+          { text: 'Editar Aula', onPress: () => handleOpenAulaModal(aula, null) },
+          { text: 'Apagar Aula', onPress: () => handleDeleteAula(aula), style: 'destructive' },
+          { text: 'Cancelar', style: 'cancel' },
+        ]);
+      } else {
+        handleOpenAulaModal(null, horario);
+      }
+    } else {
+      if (aulasDoHorario.length > 0) {
+        handleOpenCheckInModal(aulasDoHorario[0]);
+      }
     }
   };
 
-  if (loading) {
-    return (
-      <View style={styles.centered}>
-        <ActivityIndicator size="large" color="#FFD700" />
-        <Text style={{color: '#fff', marginTop: 10}}>A carregar agenda...</Text>
-      </View>
-    );
-  }
-
-  if (error) {
-    return (
-      <View style={styles.centered}>
-        <Text style={{color: 'red'}}>{error}</Text>
-      </View>
-    );
-  }
+  if (loading) { return <View style={styles.centered}><ActivityIndicator size="large" color="#FFD700" /></View>; }
+  if (error) { return <View style={styles.centered}><Text style={{ color: 'red' }}>{error}</Text></View>; }
 
   const aulasDoDia = aulasDaSemana.filter(a => a.dia_semana === diaSelecionado);
 
   return (
     <View style={styles.container}>
-      {/* Dias da semana */}
       <View style={styles.diasContainer}>
         {dias.map((dia) => (
-          <TouchableOpacity
-            key={dia}
-            style={[styles.diaQuadro, diaSelecionado === dia && styles.diaSelecionado]}
-            onPress={() => setDiaSelecionado(dia)}
-          >
-            <Text style={[styles.diaTexto, diaSelecionado === dia && styles.diaTextoSelecionado]}>
-              {dia}
-            </Text>
+          <TouchableOpacity key={dia} style={[styles.diaQuadro, diaSelecionado === dia && styles.diaSelecionado]} onPress={() => setDiaSelecionado(dia)}>
+            <Text style={[styles.diaTexto, diaSelecionado === dia && styles.diaTextoSelecionado]}>{dia}</Text>
           </TouchableOpacity>
         ))}
       </View>
-      
-      {/* Grade de horários */}
       <ScrollView contentContainerStyle={styles.horariosContainer}>
         {horarios.map((hora) => {
           const aulasDoHorario = aulasDoDia.filter(a => a.horario === hora);
           const temAula = aulasDoHorario.length > 0;
           return (
-            <TouchableOpacity 
-              key={hora}
-              style={[styles.horarioItem, temAula && styles.horarioComAula]}
-              onPress={() => temAula && handleAulaPress(aulasDoHorario[0])}
-              disabled={!temAula}
-            >
+            <TouchableOpacity key={hora} style={[styles.horarioItem, temAula && styles.horarioComAula]} onPress={() => handleSlotPress(aulasDoHorario, hora)}>
               <Text style={styles.horarioTexto}>{hora}</Text>
               {temAula && <Text style={styles.aulaTexto}>{aulasDoHorario.map(a => a.modalidade).join(' / ')}</Text>}
             </TouchableOpacity>
@@ -181,21 +190,8 @@ export default function AgendaScreen() {
         })}
       </ScrollView>
 
-      {/* Modal */}
-      {aulaSelecionada && (
-        <CheckInModal
-          visible={modalVisible}
-          onClose={() => setModalVisible(false)}
-          aula={aulaSelecionada}
-          data={getTodayDateString()}
-          checkedInAlunos={checkedInAlunos}
-          loading={loadingModal}
-          userHasCheckedIn={checkedInAlunos.some(aluno => aluno.aluno_id === user.id)}
-          isClassFinished={checkIsClassFinished(aulaSelecionada.horario)}
-          onCheckIn={handleCheckIn}
-          onCancelCheckIn={handleCancelCheckIn}
-        />
-      )}
+      {aulaParaCheckIn && <CheckInModal visible={checkInModalVisible} onClose={() => setCheckInModalVisible(false)} aula={aulaParaCheckIn} data={getTodayDateString()} checkedInAlunos={checkedInAlunos} loading={loadingCheckIn} userHasCheckedIn={checkedInAlunos.some(aluno => aluno.aluno_id === user.id)} isClassFinished={checkIsClassFinished(aulaParaCheckIn.horario)} onCheckIn={handleCheckIn} onCancelCheckIn={handleCancelCheckIn} />}
+      <AulaModal visible={aulaModalVisible} onClose={() => setAulaModalVisible(false)} onSave={handleSaveAula} aulaInicial={aulaParaGerir} horarioInicial={horarioParaNovaAula} diaInicial={diaSelecionado} />
     </View>
   );
 }
@@ -203,38 +199,14 @@ export default function AgendaScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: "#000", padding: 10 },
   centered: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#000' },
-  diasContainer: {
-    flexDirection: "row",
-    justifyContent: "space-around",
-    marginBottom: 15,
-  },
-  diaQuadro: {
-    backgroundColor: "#111",
-    paddingVertical: 10,
-    paddingHorizontal: 12,
-    borderRadius: 10,
-    marginHorizontal: 2,
-    alignItems: "center",
-  },
+  diasContainer: { flexDirection: "row", justifyContent: "space-around", marginBottom: 15 },
+  diaQuadro: { backgroundColor: "#111", paddingVertical: 10, paddingHorizontal: 12, borderRadius: 10, marginHorizontal: 2, alignItems: "center" },
   diaSelecionado: { backgroundColor: "#FFD700" },
   diaTexto: { color: "#fff", fontWeight: "bold" },
   diaTextoSelecionado: { color: "#000" },
   horariosContainer: { paddingBottom: 20 },
-  horarioItem: {
-    backgroundColor: "#111",
-    padding: 15,
-    borderRadius: 8,
-    marginBottom: 10,
-    flexDirection: "row",
-    justifyContent: "space-between",
-    minHeight: 50,
-    alignItems: 'center'
-  },
-  horarioComAula: {
-    backgroundColor: "#222",
-    borderLeftWidth: 5,
-    borderLeftColor: "#FFD700",
-  },
+  horarioItem: { backgroundColor: "#111", padding: 15, borderRadius: 8, marginBottom: 10, flexDirection: "row", justifyContent: "space-between", minHeight: 50, alignItems: 'center' },
+  horarioComAula: { backgroundColor: "#222", borderLeftWidth: 5, borderLeftColor: "#FFD700" },
   horarioTexto: { color: "#aaa", fontSize: 16 },
   aulaTexto: { color: "#FFD700", fontWeight: "bold", flex: 1, textAlign: 'right' },
 });
