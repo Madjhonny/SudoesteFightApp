@@ -5,7 +5,7 @@ import axios from "axios";
 import { useAuth } from "../context/AuthContext"; // 1. Importa o hook do Contexto
 
 // Lembre-se de manter este IP correto!
-const API_URL = "http://192.168.100.7:3000"; 
+const API_URL = "http://172.16.10.208:3000"; 
 
 export default function LoginScreen({ navigation }) {
   const [matricula, setMatricula] = useState("");

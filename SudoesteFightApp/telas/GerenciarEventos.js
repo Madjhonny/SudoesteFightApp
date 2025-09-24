@@ -4,7 +4,7 @@ import axios from 'axios';
 import { useAuth } from '../context/AuthContext';
 import * as ImagePicker from 'expo-image-picker';
 
-const API_URL = "http://192.168.100.7:3000"; // Confirme se o seu IP está correto
+const API_URL = "http://172.16.10.208:3000"; // Confirme se o seu IP está correto
 
 // --- Componente para o Modal de Adicionar/Editar ---
 const AvisoModal = ({ visible, onClose, onSave, avisoInicial }) => {

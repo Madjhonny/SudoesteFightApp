@@ -6,7 +6,7 @@ import CheckInModal from '../componentes/CheckInModal';
 import AulaModal from '../componentes/AulaModal';
 
 // Garanta que este IP está correto para a sua rede local
-const API_URL = "http://192.168.100.7:3000";
+const API_URL = "http://172.16.10.208:3000";
 
 const dias = ["Seg", "Ter", "Qua", "Qui", "Sex", "Sab"];
 

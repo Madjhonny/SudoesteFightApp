@@ -3,7 +3,7 @@ import { View, Text, StyleSheet, SectionList, ActivityIndicator, TouchableOpacit
 import axios from 'axios';
 import { useAuth } from '../context/AuthContext';
 
-const API_URL = "http://192.168.100.7:3000"; // Confirme se o seu IP está correto
+const API_URL = "http://172.16.10.208:3000"; // Confirme se o seu IP está correto
 
 // --- Componente para o Modal de Adicionar/Editar Aula ---
 const AulaModal = ({ visible, onClose, onSave, aulaInicial }) => {
