@@ -11,7 +11,8 @@ import TelaPrincipal from "./telas/TelaPrincipal";
 import BarraLateral from "./componentes/BarraLateral";
 import PainelProfessor from "./telas/PainelProfessor";
 import GerenciarEventos from "./telas/GerenciarEventos";
-import GerenciarAgenda from "./telas/GerenciarAgenda"; // <-- Nova tela importada
+import GerenciarAgenda from "./telas/GerenciarAgenda";
+import CadastrarAlunoScreen from "./telas/CadastrarAluno"; // <-- 1. Nova tela importada
 
 const Stack = createStackNavigator();
 const Drawer = createDrawerNavigator();
@@ -51,8 +52,9 @@ export default function App() {
             <Stack.Screen name="Main" component={MainNavigator} options={{ headerShown: false }}/>
             <Stack.Screen name="PainelProfessor" component={PainelProfessor} options={{ title: 'Painel do Professor', ...headerStyle }}/>
             <Stack.Screen name="GerenciarEventos" component={GerenciarEventos} options={{ title: 'Gerir Eventos', ...headerStyle }}/>
-            {/* 👇 Nova tela registada no navegador */}
             <Stack.Screen name="GerenciarAgenda" component={GerenciarAgenda} options={{ title: 'Gerir Agenda', ...headerStyle }}/>
+            {/* 👇 2. Nova tela registada no navegador */}
+            <Stack.Screen name="CadastrarAluno" component={CadastrarAlunoScreen} options={{ title: 'Cadastrar Aluno', ...headerStyle }}/>
           </Stack.Navigator>
         </NavigationContainer>
       </NotificationProvider>

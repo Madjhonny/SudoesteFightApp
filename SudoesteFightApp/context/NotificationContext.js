@@ -1,60 +1,73 @@
-import React, { createContext, useState, useContext, useCallback } from 'react';
+import React, { createContext, useState, useContext, useCallback, useEffect, useRef, useMemo } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import axios from 'axios';
+
+// Confirme se o IP está correto
+const API_URL = "http://192.168.100.7:3000"; 
+const LAST_AVISO_TIMESTAMP_KEY = '@last_aviso_timestamp';
 
 const NotificationContext = createContext({});
 
-// Esta é a "chave" que usaremos para guardar o dado no telemóvel.
-const LAST_AVISO_TIMESTAMP_KEY = '@last_aviso_timestamp';
-
 export const NotificationProvider = ({ children }) => {
   const [hasNewUpdate, setHasNewUpdate] = useState(false);
-  // Usamos uma variável global para guardar o timestamp mais recente do servidor
-  // para não precisarmos de o passar entre funções.
-  let latestTimestampFromServer = null;
+  // Usamos um 'ref' para guardar o timestamp mais recente sem causar re-renderizações desnecessárias
+  const latestTimestampRef = useRef(null);
 
-  /**
-   * Compara o timestamp do aviso mais recente do servidor
-   * com o último timestamp que o utilizador viu (guardado no telemóvel).
-   */
   const checkForUpdates = useCallback(async (avisos) => {
-    // Se não houver avisos, não há atualizações.
     if (!avisos || avisos.length === 0) {
       setHasNewUpdate(false);
       return;
     }
     
-    // Pega o timestamp do primeiro aviso (o mais recente) e converte para número.
-    latestTimestampFromServer = new Date(avisos[0].data_postagem).getTime();
+    const latestTimestamp = new Date(avisos[0].data_postagem).getTime();
+    latestTimestampRef.current = latestTimestamp; // Guarda o valor no ref
+
     const lastSeenTimestamp = await AsyncStorage.getItem(LAST_AVISO_TIMESTAMP_KEY);
 
-    // Se o utilizador nunca viu nenhum aviso, ou se o aviso do servidor é mais recente,
-    // então há uma nova atualização.
-    if (!lastSeenTimestamp || latestTimestampFromServer > parseInt(lastSeenTimestamp, 10)) {
+    if (!lastSeenTimestamp || latestTimestamp > parseInt(lastSeenTimestamp, 10)) {
       setHasNewUpdate(true);
     } else {
       setHasNewUpdate(false);
     }
   }, []);
 
-  /**
-   * Quando o utilizador visita a página de eventos, esta função é chamada
-   * para guardar o timestamp do aviso mais recente como "o último visto".
-   */
+  const silentCheckForUpdates = useCallback(async () => {
+    try {
+        const response = await axios.get(`${API_URL}/api/avisos`);
+        await checkForUpdates(response.data);
+    } catch (error) {
+        // Ignora erros silenciosamente
+    }
+  }, [checkForUpdates]);
+
+
+  // Esta função agora é estável porque não depende do estado
   const markUpdatesAsSeen = useCallback(async () => {
-    if (hasNewUpdate && latestTimestampFromServer) {
-      await AsyncStorage.setItem(LAST_AVISO_TIMESTAMP_KEY, latestTimestampFromServer.toString());
+    if (latestTimestampRef.current) {
+      await AsyncStorage.setItem(LAST_AVISO_TIMESTAMP_KEY, latestTimestampRef.current.toString());
       setHasNewUpdate(false);
     }
-  }, [hasNewUpdate]);
+  }, []);
+
+  // Verifica as atualizações quando a app inicia
+  useEffect(() => {
+    silentCheckForUpdates();
+  }, [silentCheckForUpdates]);
+
+  // 'useMemo' garante que o objeto de contexto só muda quando 'hasNewUpdate' muda
+  const value = useMemo(() => ({
+    hasNewUpdate,
+    checkForUpdates,
+    markUpdatesAsSeen
+  }), [hasNewUpdate, checkForUpdates, markUpdatesAsSeen]);
 
   return (
-    <NotificationContext.Provider value={{ hasNewUpdate, checkForUpdates, markUpdatesAsSeen }}>
+    <NotificationContext.Provider value={value}>
       {children}
     </NotificationContext.Provider>
   );
 };
 
-// Hook customizado para facilitar o acesso ao contexto.
 export const useNotification = () => {
   return useContext(NotificationContext);
 };

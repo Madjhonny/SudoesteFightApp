@@ -1,41 +1,34 @@
-// telas/TelaLogin.js
 import React, { useState } from "react";
-import { View, Text, TextInput, Image, TouchableOpacity, StyleSheet, Alert } from "react-native";
+import { View, Text, TextInput, Image, TouchableOpacity, StyleSheet, Alert, Platform } from "react-native";
 import axios from "axios";
-import { useAuth } from "../context/AuthContext"; // 1. Importa o hook do Contexto
+import { useAuth } from "../context/AuthContext";
 
-// Lembre-se de manter este IP correto!
-const API_URL = "http://172.16.10.208:3000"; 
+const API_URL = "http://192.168.100.7:3000"; // Confirme se o IP está correto
 
 export default function LoginScreen({ navigation }) {
   const [matricula, setMatricula] = useState("");
-  const { login } = useAuth(); // 2. Pega a função 'login' do nosso AuthContext
+  const [senha, setSenha] = useState(""); // 1. Novo estado para a senha
+  const { login } = useAuth();
 
   const handleLogin = async () => {
-    if (matricula.trim() === "") {
-      Alert.alert("Erro", "Por favor, digite sua matrícula.");
+    if (matricula.trim() === "" || senha.trim() === "") {
+      Alert.alert("Erro", "Por favor, preencha a matrícula e a senha.");
       return;
     }
     try {
-      // Faz a requisição POST para a sua API de login
+      // 2. Envia a matrícula E a senha para o backend
       const response = await axios.post(`${API_URL}/api/login`, {
         matricula: matricula,
+        senha: senha,
       });
 
-      // Se o login for bem-sucedido (status 200)
       if (response.data) {
-        const userData = response.data; // Dados do aluno vindo do backend
-        
-        // 3. Salva os dados do usuário no estado global do aplicativo
-        login(userData); 
-        
-        // 4. Navega para a tela principal (sem precisar passar parâmetros)
+        login(response.data);
         navigation.replace("Main");
       }
     } catch (error) {
-      // Se o servidor retornar um erro (ex: 401 Matrícula inválida)
-      console.error("Erro no login:", error);
-      Alert.alert("Falha no Login", "Matrícula inválida ou não encontrada. Tente novamente.");
+      console.error("Erro no login:", error.response?.data || error.message);
+      Alert.alert("Falha no Login", "Matrícula ou senha inválida. Tente novamente.");
     }
   };
 
@@ -48,12 +41,24 @@ export default function LoginScreen({ navigation }) {
         <Text style={styles.label}>Matrícula</Text>
         <TextInput
           style={styles.input}
-          placeholder="Digite sua matrícula"
+          placeholder="Digite a sua matrícula"
           placeholderTextColor="#aaa"
           keyboardType="numeric"
           value={matricula}
           onChangeText={setMatricula}
         />
+        
+        {/* 3. Novo campo de texto para a senha */}
+        <Text style={styles.label}>Senha</Text>
+        <TextInput
+          style={styles.input}
+          placeholder="Digite a sua senha"
+          placeholderTextColor="#aaa"
+          secureTextEntry={true} // Esconde os caracteres da senha
+          value={senha}
+          onChangeText={setSenha}
+        />
+
         <TouchableOpacity style={styles.button} onPress={handleLogin}>
           <Text style={styles.buttonText}>Entrar</Text>
         </TouchableOpacity>
@@ -84,29 +89,33 @@ const styles = StyleSheet.create({
     backgroundColor: "#111",
     borderRadius: 20,
     padding: 25,
-    width: "80%",
-    shadowColor: "#FFD700",
-    shadowOpacity: 0.3,
-    shadowRadius: 10,
+    width: Platform.select({
+      web: 350,
+      default: '80%',
+    }),
+    maxWidth: '90%',
     elevation: 10,
   },
   label: {
     color: "#FFD700",
     fontSize: 16,
     marginBottom: 5,
+    marginTop: 10, // Adiciona um espaço acima do rótulo da senha
   },
   input: {
     backgroundColor: "#222",
     borderRadius: 10,
-    padding: 10,
+    padding: 12, // Um pouco mais de padding
     color: "#fff",
-    marginBottom: 20,
+    marginBottom: 15, // Um pouco menos de margem
+    fontSize: 16,
   },
   button: {
     backgroundColor: "#FFD700",
     padding: 15,
     borderRadius: 10,
     alignItems: "center",
+    marginTop: 15,
   },
   buttonText: {
     fontWeight: "bold",
@@ -114,3 +123,4 @@ const styles = StyleSheet.create({
     fontSize: 16,
   },
 });
+

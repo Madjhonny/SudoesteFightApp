@@ -7,7 +7,14 @@ export default function PainelProfessor({ navigation }) {
       <View style={styles.container}>
         <Text style={styles.title}>Área do Professor</Text>
         
-        {/* Este botão agora está funcional e navega para a nova tela */}
+        {/* Novo botão para cadastrar alunos */}
+        <TouchableOpacity 
+          style={styles.button}
+          onPress={() => navigation.navigate('CadastrarAluno')}
+        >
+          <Text style={styles.buttonText}>Cadastrar Novo Aluno</Text>
+        </TouchableOpacity>
+        
         <TouchableOpacity 
           style={styles.button}
           onPress={() => navigation.navigate('GerenciarAgenda')}

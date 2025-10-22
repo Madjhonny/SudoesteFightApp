@@ -4,7 +4,7 @@ import axios from 'axios';
 import { useAuth } from '../context/AuthContext';
 import * as ImagePicker from 'expo-image-picker';
 
-const API_URL = "http://172.16.10.208:3000"; // Confirme se o seu IP está correto
+const API_URL = "http://192.168.100.7:3000"; // Confirme se o seu IP está correto
 
 // --- Componente para o Modal de Adicionar/Editar ---
 const AvisoModal = ({ visible, onClose, onSave, avisoInicial }) => {
@@ -95,6 +95,7 @@ const AvisoModal = ({ visible, onClose, onSave, avisoInicial }) => {
     );
 };
 
+
 // --- Componente Principal ---
 export default function GerenciarEventos() {
     const [avisos, setAvisos] = useState([]);
@@ -122,7 +123,7 @@ export default function GerenciarEventos() {
         const formData = new FormData();
         formData.append('titulo', aviso.titulo);
         formData.append('mensagem', aviso.mensagem);
-        formData.append('aluno_id', user.matricula); // Envia matrícula para backend
+        formData.append('aluno_id', user.id);
 
         // Anexa a nova mídia apenas se ela foi selecionada (se tem um 'uri' local)
         if (aviso.media && aviso.media.uri && !aviso.media.uri.startsWith('http')) {
@@ -146,7 +147,7 @@ export default function GerenciarEventos() {
             Alert.alert("Erro", "Não foi possível salvar o aviso.");
         }
     };
-
+    
     const handleDeleteAviso = (id) => {
         Alert.alert("Confirmar Exclusão", "Tem a certeza que deseja apagar este aviso?", [
             { text: "Cancelar" },
@@ -154,7 +155,7 @@ export default function GerenciarEventos() {
                 text: "Apagar", style: "destructive",
                 onPress: async () => {
                     try {
-                        await axios.delete(`${API_URL}/api/avisos/${id}?aluno_id=${user.matricula}`);
+                        await axios.delete(`${API_URL}/api/avisos/${id}?aluno_id=${user.id}`);
                         fetchAvisos();
                     } catch (error) {
                         Alert.alert("Erro", "Não foi possível apagar o aviso.");
@@ -218,7 +219,7 @@ const styles = StyleSheet.create({
         borderRadius: 8,
         marginHorizontal: 15,
         marginVertical: 10,
-        overflow: 'hidden',
+        overflow: 'hidden', // Para a imagem não sair das bordas
     },
     avisoImage: {
         width: '100%',
@@ -245,6 +246,7 @@ const styles = StyleSheet.create({
         backgroundColor: '#FFD700', justifyContent: 'center', alignItems: 'center', elevation: 8,
     },
     fabText: { fontSize: 30, color: '#000' },
+    // Estilos do Modal
     modalContainer: { flex: 1, justifyContent: 'center', backgroundColor: 'rgba(0,0,0,0.8)' },
     modalContent: {
         backgroundColor: '#1e1e1e', borderRadius: 20, padding: 20, width: '90%',
@@ -283,3 +285,4 @@ const styles = StyleSheet.create({
     buttonClose: { backgroundColor: '#555' },
     buttonText: { color: '#000', fontWeight: 'bold', textAlign: 'center' },
 });
+
